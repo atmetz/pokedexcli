@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -16,16 +17,12 @@ type cliCommand struct {
 }
 
 type config struct {
-	next     string
-	previous string
+	pokeapiClient pokeapi.Client
+	next          *string
+	previous      *string
 }
 
-func startRepl() {
-
-	config := config{
-		next:     "https://pokeapi.co/api/v2/location-area/",
-		previous: "",
-	}
+func startRepl(con *config) {
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
@@ -39,7 +36,7 @@ func startRepl() {
 
 		command, exists := getCommands()[commandName]
 		if exists {
-			err := command.callback(&config)
+			err := command.callback(con)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -78,17 +75,37 @@ func commandHelp(con *config) error {
 }
 
 func commandMap(con *config) error {
-	con.next, con.previous = pokeapi.SeeMap(con.next)
+
+	locationsResp, err := con.pokeapiClient.SeeMap(con.next)
+	if err != nil {
+		return err
+	}
+
+	con.next = locationsResp.Next
+	con.previous = locationsResp.Previous
+
+	for _, loc := range locationsResp.Results {
+		fmt.Println(loc.Name)
+	}
 
 	return nil
 }
 
 func commandMapb(con *config) error {
-	if con.previous == "" {
-		fmt.Println("you're on the first page")
-		return nil
+	if con.previous == nil {
+		return errors.New("you're on the first page")
 	}
-	con.next, con.previous = pokeapi.SeeMap(con.previous)
+	locationsResp, err := con.pokeapiClient.SeeMap(con.previous)
+	if err != nil {
+		return err
+	}
+
+	con.next = locationsResp.Next
+	con.previous = locationsResp.Previous
+
+	for _, loc := range locationsResp.Results {
+		fmt.Println(loc.Name)
+	}
 
 	return nil
 }
