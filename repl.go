@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,13 +12,14 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(*config) error
+	callback    func(*config, ...string) error
 }
 
 type config struct {
 	pokeapiClient pokeapi.Client
 	next          *string
 	previous      *string
+	caughtPokemon map[string]pokeapi.Pokemon
 }
 
 func startRepl(con *config) {
@@ -33,10 +33,14 @@ func startRepl(con *config) {
 			continue
 		}
 		commandName := line[0]
+		args := []string{}
+		if len(line) > 1 {
+			args = line[1:]
+		}
 
 		command, exists := getCommands()[commandName]
 		if exists {
-			err := command.callback(con)
+			err := command.callback(con, args...)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -55,61 +59,6 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit(con *config) error {
-	fmt.Println("Closing the Pokedex... Goodbye!")
-	os.Exit(0)
-
-	return nil
-}
-
-func commandHelp(con *config) error {
-	fmt.Println("Welcome to the Pokedex!\nUsage:")
-	fmt.Println()
-	commandMap := getCommands()
-
-	for command := range commandMap {
-		fmt.Printf("%s: %s\n", commandMap[command].name, commandMap[command].description)
-	}
-
-	return nil
-}
-
-func commandMap(con *config) error {
-
-	locationsResp, err := con.pokeapiClient.SeeMap(con.next)
-	if err != nil {
-		return err
-	}
-
-	con.next = locationsResp.Next
-	con.previous = locationsResp.Previous
-
-	for _, loc := range locationsResp.Results {
-		fmt.Println(loc.Name)
-	}
-
-	return nil
-}
-
-func commandMapb(con *config) error {
-	if con.previous == nil {
-		return errors.New("you're on the first page")
-	}
-	locationsResp, err := con.pokeapiClient.SeeMap(con.previous)
-	if err != nil {
-		return err
-	}
-
-	con.next = locationsResp.Next
-	con.previous = locationsResp.Previous
-
-	for _, loc := range locationsResp.Results {
-		fmt.Println(loc.Name)
-	}
-
-	return nil
-}
-
 func getCommands() map[string]cliCommand {
 	return map[string]cliCommand{
 		"help": {
@@ -126,6 +75,21 @@ func getCommands() map[string]cliCommand {
 			name:        "mapb",
 			description: "Get the previous page of locations",
 			callback:    commandMapb,
+		},
+		"explore": {
+			name:        "explore <location_name>",
+			description: "Explore a location",
+			callback:    commandExplore,
+		},
+		"catch": {
+			name:        "catch <Pokemon name>",
+			description: "Attempt to chatch a pokemon",
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect <Pokemon name>",
+			description: "See the stats of a caught pokemon",
+			callback:    commandInspect,
 		},
 		"exit": {
 			name:        "exit",
