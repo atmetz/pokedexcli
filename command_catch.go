@@ -24,6 +24,7 @@ func commandCatch(con *config, args ...string) error {
 
 	if catchChance < 40 {
 		fmt.Printf("%s was caught!\n", pokemonResp.Name)
+		fmt.Println("You may now inspect it with the inspect command.")
 		con.caughtPokemon[pokemonResp.Name] = pokemonResp
 		return nil
 	}
